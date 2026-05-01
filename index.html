@@ -280,6 +280,16 @@
             <label class="form-label">Your Full Name</label>
             <input class="form-input" type="text" id="custName" placeholder="Enter your name">
         </div>
+        
+                <div class="form-group">
+            <label class="form-label">Mobile Number</label>
+            <input class="form-input" type="number" id="custPhone" placeholder="Enter your 10 digit number">
+        </div>
+
+        
+
+
+        
         <div class="form-group" id="addrGroup">
             <label class="form-label">Delivery Address</label>
             <input class="form-input" type="text" id="custAddress" placeholder="House No., Street, Area, City...">
@@ -377,17 +387,33 @@ db.ref('products/').on('value', (snap) => {
 
 function renderProducts(products) {
     const grid = document.getElementById('productGrid');
-    const entries = Object.entries(products).filter(([k,p]) => {
-        if (activeCategory !== 'all' && (p.category||'General') !== activeCategory) return false;
-        const q = document.getElementById('searchInput').value.toLowerCase();
+    
+    // 1. Get search input and trim spaces
+    // .trim() use karne se "Hair Dryer " apne aap "Hair Dryer" ban jayega
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+
+    const entries = Object.entries(products).filter(([k, p]) => {
+        // Category filter
+        if (activeCategory !== 'all' && (p.category || 'General') !== activeCategory) return false;
+        
+        // 2. Improved Search Logic
+        // Agar input hai, to extra spaces hata kar check karega
         if (q && !p.name.toLowerCase().includes(q)) return false;
+        
         return true;
     });
+
     document.getElementById('productCount').textContent = entries.length + ' Products';
+
     if (!entries.length) {
-        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)"><div style="font-size:44px;margin-bottom:12px">🔍</div><div style="font-size:14px;font-weight:700">No products found</div></div>`;
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)">
+            <div style="font-size:44px;margin-bottom:12px">🔍</div>
+            <div style="font-size:14px;font-weight:700">No products found</div>
+            <div style="font-size:12px;margin-top:4px">Check for typos or try another name</div>
+        </div>`;
         return;
     }
+
     grid.innerHTML = entries.map(([key, p], i) => {
         const emoji = getEmoji(p.name);
         const disc = getDiscount();
@@ -397,12 +423,16 @@ function renderProducts(products) {
         const imgHTML = p.image
             ? `<img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover">`
             : `<span class="emoji-fb">${emoji}</span>`;
-        return `<div class="product-card" style="animation-delay:${i*0.06}s" onclick="openOrder('${key}')">
+
+        return `<div class="product-card" style="animation-delay:${i * 0.06}s" onclick="openOrder('${key}')">
             <div class="product-image">${imgHTML}<span class="badge-new">New</span></div>
             <div class="product-body">
-                <div class="product-category">${p.category||'General'}</div>
+                <div class="product-category">${p.category || 'General'}</div>
                 <div class="product-name">${p.name}</div>
-                <div class="product-rating"><span class="stars">${getStars(parseFloat(rating))}</span><span class="rating-count">(${reviews})</span></div>
+                <div class="product-rating">
+                    <span class="stars">${getStars(parseFloat(rating))}</span>
+                    <span class="rating-count">(${reviews})</span>
+                </div>
                 <div class="product-price-row">
                     <span class="price-main">₹${Number(p.price).toLocaleString('en-IN')}</span>
                     <span class="price-original">₹${orig.toLocaleString('en-IN')}</span>
@@ -455,13 +485,16 @@ function setDeliveryType(type) {
 
 
 // ---- CUSTOMER APP: Modified placeOrder for AM/PM ----
+
+// ---- CUSTOMER APP: Updated placeOrder with Phone Number ----
 function placeOrder() {
     const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim(); // Naya Phone field
     const addr = selectedDeliveryType === 'pickup' ? 'Self Pickup' : document.getElementById('custAddress').value.trim();
     const date = document.getElementById('orderDate').value;
-    
-    // Yahan AM/PM wala time format banaya hai
-    const rawTime = document.getElementById('orderTime').value; // e.g. "14:30"
+    const rawTime = document.getElementById('orderTime').value;
+
+    // Time to AM/PM converter
     let timeWithAMPM = "";
     if(rawTime) {
         const [h, m] = rawTime.split(':');
@@ -470,16 +503,33 @@ function placeOrder() {
         timeWithAMPM = hours + ":" + m + " " + suffix;
     }
 
-    if (!name || !date || !rawTime || (selectedDeliveryType === 'delivery' && !addr.trim())) {
-        shakeModal(); showToast('Please fill all details ❗', true); return;
+    // Validation: Phone number check karein
+    if (!name || !phone || !date || !rawTime || (selectedDeliveryType === 'delivery' && !addr.trim())) {
+        shakeModal(); showToast('Please fill all details including Phone ❗', true); return;
+    }
+    
+    if (phone.length < 8) {
+        shakeModal(); showToast('Please enter a valid mobile number 📞', true); return;
     }
 
+    // SAVE details for next time
+    savedName = name;
+    savedPhone = phone; // Variable mein save karein
+    localStorage.setItem('sa_name', name);
+    localStorage.setItem('sa_phone', phone); // Phone memory mein save karein
+    if (selectedDeliveryType === 'delivery') {
+        savedAddress = addr;
+        localStorage.setItem('sa_address', addr);
+    }
+
+    // Firebase Push
     db.ref('orders/').push({
         itemName: currentItem.name,
         customerName: name,
+        customerPhone: phone, // Yeh merchant app ke "Call" button ke liye hai
         address: addr,
-        date: date,
-        time: timeWithAMPM, // Ab yahan AM/PM ke saath save hoga
+        date, 
+        time: timeWithAMPM,
         deliveryType: selectedDeliveryType,
         status: 'new',
         orderedAt: Date.now(),
@@ -494,6 +544,7 @@ function placeOrder() {
 
 
 // ---- OPEN ORDER MODAL ----
+
 function openOrder(key) {
     const p = allProducts[key];
     currentItem = { key, ...p };
@@ -501,19 +552,38 @@ function openOrder(key) {
     document.getElementById('previewPrice').textContent = '₹' + Number(p.price).toLocaleString('en-IN');
     const imgEl = document.getElementById('previewImg');
     const emojiEl = document.getElementById('previewEmoji');
+    
     if (p.image) {
-        imgEl.src = p.image; imgEl.style.display = 'block'; emojiEl.style.display = 'none';
+        imgEl.src = p.image; 
+        imgEl.style.display = 'block'; 
+        emojiEl.style.display = 'none';
     } else {
-        imgEl.style.display = 'none'; emojiEl.style.display = 'block'; emojiEl.textContent = getEmoji(p.name);
+        imgEl.style.display = 'none'; 
+        emojiEl.style.display = 'block'; 
+        emojiEl.textContent = getEmoji(p.name);
     }
-    // AUTO-FILL saved name & address
-    if (savedName) document.getElementById('custName').value = savedName;
-    if (savedAddress) document.getElementById('custAddress').value = savedAddress;
+
+    // AUTO-FILL saved name, address & phone
+    if (savedName) {
+        document.getElementById('custName').value = savedName;
+    }
+    if (savedAddress) {
+        document.getElementById('custAddress').value = savedAddress;
+    }
+    
+    // ---- PHONE AUTO-FILL ADDED HERE ----
+    if (localStorage.getItem('sa_phone')) {
+        document.getElementById('custPhone').value = localStorage.getItem('sa_phone');
+    }
+
     document.getElementById('orderDate').value = new Date().toISOString().split('T')[0];
+    
     // Reset delivery type
     setDeliveryType('delivery');
     document.getElementById('orderModal').classList.add('open');
 }
+
+
 function closeModal() { document.getElementById('orderModal').classList.remove('open'); }
 
 // ---- PLACE ORDER ----
