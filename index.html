@@ -1,4 +1,3 @@
-<!-- START OF FILE index.html (Shop App) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -175,8 +174,8 @@
         .my-order-item { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
         .my-order-info { font-size: 11px; color: var(--muted); line-height: 1.4; }
         
-        .completion-log { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 11px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 5px; }
-        .completion-log .dot-green { width: 6px; height: 6px; background: var(--green); border-radius: 50%; }
+        /* Time Log */
+        .time-done { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
 
         /* ORDER TRACKER */
         .tracker { display: flex; align-items: center; margin-top: 10px; }
@@ -272,7 +271,14 @@
         <span class="see-all" id="productCount">0 Products</span>
     </div>
     <div class="product-grid" id="productGrid">
-        <!-- Products will load here -->
+        <div style="background:white;border-radius:12px;overflow:hidden;border:1px solid var(--border)">
+            <div class="skeleton" style="height:140px"></div>
+            <div style="padding:12px"><div class="skeleton" style="height:10px;width:55%;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:80%;margin-bottom:8px"></div><div class="skeleton" style="height:20px;width:45%;margin-bottom:9px"></div><div class="skeleton" style="height:32px"></div></div>
+        </div>
+        <div style="background:white;border-radius:12px;overflow:hidden;border:1px solid var(--border)">
+            <div class="skeleton" style="height:140px"></div>
+            <div style="padding:12px"><div class="skeleton" style="height:10px;width:55%;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:80%;margin-bottom:8px"></div><div class="skeleton" style="height:20px;width:45%;margin-bottom:9px"></div><div class="skeleton" style="height:32px"></div></div>
+        </div>
     </div>
 </div>
 
@@ -322,7 +328,7 @@
         <div class="profile-sub" id="profileSub">View your orders below</div>
     </div>
     <div class="profile-body">
-        <div class="p-section-title">History & Tracking</div>
+        <div class="p-section-title">My Orders</div>
         <div id="myOrdersList">
             <div class="empty-orders"><div class="big">📦</div><p>No orders yet.<br>Start shopping!</p></div>
         </div>
@@ -360,11 +366,15 @@ let cartCount = 0;
 let categories = new Set(['all']);
 let activeCategory = 'all';
 let myName = localStorage.getItem('shopapp_name') || '';
-let myAddress = localStorage.getItem('shopapp_address') || ''; // Auto save address
-let myOrders = {};
+let myAddress = localStorage.getItem('shopapp_address') || ''; // NEW: Auto-save Address
+let myOrders = {}; 
 
 const emojiMap = ['👟','👗','📱','💻','🎮','📺','🎒','⌚','🕶️','👜','🧴','🍕','🧸','🎵','📸','🪴','🏋️','🧩','💎','🎁'];
 function getEmoji(name) { return emojiMap[Math.abs((name||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % emojiMap.length]; }
+function getDiscount() { return Math.floor(Math.random()*30+10); }
+function getRating() { return (Math.random()*1.5+3.5).toFixed(1); }
+function getReviews() { return Math.floor(Math.random()*2000+100); }
+function getStars(r) { const f=Math.floor(r); return '★'.repeat(f)+(r-f>=0.5?'½':'')+'☆'.repeat(5-Math.ceil(r)); }
 
 // ---- LOAD PRODUCTS ----
 db.ref('products/').on('value', (snap) => {
@@ -387,16 +397,29 @@ function renderProducts(products) {
         return true;
     });
     document.getElementById('productCount').textContent = entries.length + ' Products';
+    if (!entries.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">🔍</div><div style="font-size:14px;font-weight:700">No products found</div></div>`;
+        return;
+    }
     grid.innerHTML = entries.map(([key, p], i) => {
         const emoji = getEmoji(p.name);
-        const imgHTML = p.image ? `<img src="${p.image}" alt="${p.name}">` : `<span class="emoji-fallback">${emoji}</span>`;
-        return `<div class="product-card" onclick="openOrder('${key}')">
+        const disc = getDiscount();
+        const orig = Math.round(p.price * 100 / (100 - disc));
+        const imgHTML = p.image
+            ? `<img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover">`
+            : `<span class="emoji-fallback">${emoji}</span>`;
+        return `<div class="product-card" style="animation-delay:${i*0.06}s" onclick="openOrder('${key}')">
             <div class="product-image">${imgHTML}<span class="badge-new">New</span></div>
             <div class="product-body">
                 <div class="product-category">${p.category||'General'}</div>
                 <div class="product-name">${p.name}</div>
-                <div class="product-price-row"><span class="price-main">₹${Number(p.price).toLocaleString('en-IN')}</span></div>
-                <button class="btn-add">🛒 Add to Cart</button>
+                <div class="product-rating"><span class="stars">${getStars(parseFloat(getRating()))}</span><span class="rating-count">(${getReviews()})</span></div>
+                <div class="product-price-row">
+                    <span class="price-main">₹${Number(p.price).toLocaleString('en-IN')}</span>
+                    <span class="price-original">₹${orig.toLocaleString('en-IN')}</span>
+                    <span class="price-off">${disc}% off</span>
+                </div>
+                <button class="btn-add" onclick="event.stopPropagation();openOrder('${key}')">🛒 Add to Cart</button>
             </div>
         </div>`;
     }).join('');
@@ -413,7 +436,12 @@ function updateCategories() {
         row.appendChild(chip);
     });
 }
-function filterByCategory(cat, el) { activeCategory = cat; renderProducts(allProducts); }
+function filterByCategory(cat, el) {
+    activeCategory = cat;
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderProducts(allProducts);
+}
 function filterProducts() { renderProducts(allProducts); }
 
 // ---- OPEN ORDER ----
@@ -424,10 +452,12 @@ function openOrder(key) {
     document.getElementById('previewPrice').textContent = '₹' + Number(p.price).toLocaleString('en-IN');
     const imgEl = document.getElementById('previewImg');
     const emojiEl = document.getElementById('previewEmoji');
-    if (p.image) { imgEl.src = p.image; imgEl.style.display = 'block'; emojiEl.style.display = 'none'; }
-    else { imgEl.style.display = 'none'; emojiEl.style.display = 'block'; emojiEl.textContent = getEmoji(p.name); }
-    
-    // Auto populate saved details
+    if (p.image) {
+        imgEl.src = p.image; imgEl.style.display = 'block'; emojiEl.style.display = 'none';
+    } else {
+        imgEl.style.display = 'none'; emojiEl.style.display = 'block'; emojiEl.textContent = getEmoji(p.name);
+    }
+    // Auto-fill details
     if (myName) document.getElementById('custName').value = myName;
     if (myAddress) document.getElementById('custAddress').value = myAddress;
     
@@ -442,9 +472,9 @@ function placeOrder() {
     const addr = document.getElementById('custAddress').value.trim();
     const date = document.getElementById('orderDate').value;
     const time = document.getElementById('orderTime').value;
-    if (!name || !addr || !date || !time) { showToast('Please fill all details ❗', true); return; }
+    if (!name || !addr || !date || !time) { shakeModal(); showToast('Please fill all details ❗', true); return; }
     
-    // Save to local for next time
+    // Save details to Local Storage
     myName = name;
     myAddress = addr;
     localStorage.setItem('shopapp_name', name);
@@ -472,7 +502,9 @@ db.ref('orders/').on('value', (snap) => {
     myOrders = {};
     snap.forEach(c => {
         const o = c.val();
-        if (myName && o.customerName === myName) myOrders[c.key] = o;
+        if (myName && o.customerName === myName) {
+            myOrders[c.key] = o;
+        }
     });
     if (myName) renderMyOrders();
     updateProfileInfo();
@@ -480,42 +512,109 @@ db.ref('orders/').on('value', (snap) => {
 
 function renderMyOrders() {
     const div = document.getElementById('myOrdersList');
-    const entries = Object.entries(myOrders).reverse();
-    if (!entries.length) { div.innerHTML = `<div class="empty-orders"><div class="big">📦</div><p>No orders yet.</p></div>`; return; }
+    // Sort so newest orders show up first in history list
+    const entries = Object.entries(myOrders).sort((a,b) => (b[1].orderedAt||0) - (a[1].orderedAt||0));
     
-    let i = entries.length;
-    div.innerHTML = entries.map(([key, o]) => {
-        const status = o.status || 'new';
-        const isDone = status === 'delivered' || status === 'pickup';
-        const statusLabel = status === 'delivered' ? '✅ Delivered' : status === 'pickup' ? '🟡 Pickup Done' : '🟢 Processing';
-        const statusClass = status === 'delivered' ? 'delivered' : status === 'pickup' ? 'pickup' : 'new';
-        
-        const completionHTML = isDone ? `<div class="completion-log"><div class="dot-green"></div> Done at ${o.completedAt || '---'}</div>` : '';
+    if (!entries.length) {
+        div.innerHTML = `<div class="empty-orders"><div class="big">📦</div><p>No orders yet.<br>Start shopping!</p></div>`;
+        return;
+    }
 
-        return `<div class="my-order-card">
-            <div class="my-order-top">
-                <span class="my-order-id">#ORD-${String(i--).padStart(4,'0')}</span>
-                <span class="my-status ${statusClass}">${statusLabel}</span>
-            </div>
-            <div class="my-order-item">🛒 ${o.itemName}</div>
-            <div class="my-order-info">Ordered: ${o.date} ${o.time||''}<br>Addr: ${o.address}</div>
-            ${completionHTML}
-        </div>`;
-    }).join('');
+    // Get total count of ALL customer orders for proper ID display
+    db.ref('orders/').once('value', allSnap => {
+        const allSorted = Object.entries(allSnap.val()||{}).sort((a,b) => (a[1].orderedAt||0) - (b[1].orderedAt||0));
+        
+        div.innerHTML = entries.map(([key, o]) => {
+            const status = o.status || 'new';
+            const statusLabel = status === 'delivered' ? '✅ Delivered' : status === 'pickup' ? '🟡 Pickup Done' : '🟢 Order Placed';
+            const statusClass = status === 'delivered' ? 'delivered' : status === 'pickup' ? 'pickup' : 'new';
+            
+            // Find global sequential index
+            const globalIdx = allSorted.findIndex(e => e[0] === key) + 1;
+            
+            const timeLog = (status === 'delivered' || status === 'pickup') 
+                ? `<div class="time-done">Completed at: ${o.completedAt || '---'}</div>` 
+                : '';
+
+            const step1done = true;
+            const step2done = status === 'delivered' || status === 'pickup';
+            const step3done = status === 'delivered';
+            const step4done = status === 'pickup';
+            
+            const trackerHTML = `
+                <div class="tracker">
+                    <div class="tracker-step">
+                        <div class="t-dot done">✓</div>
+                        <div class="t-label done">Placed</div>
+                    </div>
+                    <div class="t-line ${step2done?'done':''}"></div>
+                    <div class="tracker-step">
+                        <div class="t-dot ${step2done?'done':status==='new'?'active':''}">
+                            ${step2done?'✓':'🔄'}
+                        </div>
+                        <div class="t-label ${step2done?'done':status==='new'?'active':''}">Processing</div>
+                    </div>
+                    <div class="t-line ${step3done||step4done?'done':''}"></div>
+                    <div class="tracker-step">
+                        <div class="t-dot ${step3done||step4done?'done':''}">
+                            ${step3done?'🏠':step4done?'🛍️':'📦'}
+                        </div>
+                        <div class="t-label ${step3done||step4done?'done':''}">${step4done?'Pickup':'Delivery'}</div>
+                    </div>
+                </div>`;
+            return `<div class="my-order-card">
+                <div class="my-order-top">
+                    <span class="my-order-id">#ORD-${String(globalIdx).padStart(4,'0')}</span>
+                    <span class="my-status ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="my-order-item">🛒 ${o.itemName}</div>
+                <div class="my-order-info">📅 ${o.date} ${o.time||''} &nbsp;•&nbsp; 📍 ${o.address}</div>
+                ${trackerHTML}
+                ${timeLog}
+            </div>`;
+        }).join('');
+    });
 }
 
 function updateProfileInfo() {
     if (myName) {
         document.getElementById('profileName').textContent = myName;
-        document.getElementById('profileSub').textContent = Object.keys(myOrders).length + ' total orders in history';
+        document.getElementById('profileSub').textContent = Object.keys(myOrders).length + ' total orders placed';
     }
 }
 
-function openProfile() { document.getElementById('profilePanel').classList.add('open'); document.getElementById('profileOverlay').classList.add('open'); }
-function closeProfile() { document.getElementById('profilePanel').classList.remove('open'); document.getElementById('profileOverlay').classList.remove('open'); }
+// ---- PROFILE ----
+function openProfile() {
+    document.getElementById('profilePanel').classList.add('open');
+    document.getElementById('profileOverlay').classList.add('open');
+    document.getElementById('profileBtn').querySelector('.profile-notif').classList.remove('show');
+    if (myName) renderMyOrders();
+}
+function closeProfile() {
+    document.getElementById('profilePanel').classList.remove('open');
+    document.getElementById('profileOverlay').classList.remove('open');
+}
 function openCart() { showToast(`${cartCount} item(s) in cart 🛒`); }
 function closeSuccess() { document.getElementById('successOverlay').classList.remove('open'); }
-function showToast(msg, error=false) { const t = document.getElementById('toast'); t.textContent = msg; t.style.cssText = `background:${error?'#ef4444':'#22c55e'};display:block;`; setTimeout(()=> t.style.display='none', 2500); }
+
+function shakeModal() {
+    const m = document.querySelector('#orderModal .modal');
+    m.style.animation = 'none'; m.offsetHeight;
+    m.style.animation = 'shake 0.4s ease';
+    setTimeout(() => m.style.animation = '', 400);
+}
+const s = document.createElement('style');
+s.textContent = `@keyframes shake{0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}}`;
+document.head.appendChild(s);
+
+document.getElementById('orderModal').addEventListener('click', function(e) { if(e.target===this) closeModal(); });
+
+function showToast(msg, error=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.cssText = `background:${error?'#ef4444':'#22c55e'};display:block;`;
+    setTimeout(()=> t.style.display='none', 2500);
+}
 </script>
 </body>
 </html>
