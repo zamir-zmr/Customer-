@@ -434,6 +434,7 @@ function filterByCategory(cat, el) {
 function filterProducts() { renderProducts(allProducts); }
 
 // ---- DELIVERY TYPE TOGGLE ----
+// ---- CUSTOMER APP: Delivery Type Selection ----
 function setDeliveryType(type) {
     selectedDeliveryType = type;
     document.getElementById('btnDelivery').classList.toggle('active', type === 'delivery');
@@ -449,6 +450,48 @@ function setDeliveryType(type) {
         orderBtn.textContent = '⚡ Confirm Order';
     }
 }
+
+// ---- CUSTOMER APP: Place Order Function ----
+
+
+// ---- CUSTOMER APP: Modified placeOrder for AM/PM ----
+function placeOrder() {
+    const name = document.getElementById('custName').value.trim();
+    const addr = selectedDeliveryType === 'pickup' ? 'Self Pickup' : document.getElementById('custAddress').value.trim();
+    const date = document.getElementById('orderDate').value;
+    
+    // Yahan AM/PM wala time format banaya hai
+    const rawTime = document.getElementById('orderTime').value; // e.g. "14:30"
+    let timeWithAMPM = "";
+    if(rawTime) {
+        const [h, m] = rawTime.split(':');
+        const suffix = h >= 12 ? "PM" : "AM";
+        const hours = ((h % 12) || 12);
+        timeWithAMPM = hours + ":" + m + " " + suffix;
+    }
+
+    if (!name || !date || !rawTime || (selectedDeliveryType === 'delivery' && !addr.trim())) {
+        shakeModal(); showToast('Please fill all details ❗', true); return;
+    }
+
+    db.ref('orders/').push({
+        itemName: currentItem.name,
+        customerName: name,
+        address: addr,
+        date: date,
+        time: timeWithAMPM, // Ab yahan AM/PM ke saath save hoga
+        deliveryType: selectedDeliveryType,
+        status: 'new',
+        orderedAt: Date.now(),
+        productKey: currentItem.key
+    }).then(() => {
+        closeModal();
+        document.getElementById('successOverlay').classList.add('open');
+        loadMyOrders();
+    });
+}
+
+
 
 // ---- OPEN ORDER MODAL ----
 function openOrder(key) {
@@ -474,40 +517,6 @@ function openOrder(key) {
 function closeModal() { document.getElementById('orderModal').classList.remove('open'); }
 
 // ---- PLACE ORDER ----
-function placeOrder() {
-    const name = document.getElementById('custName').value.trim();
-    const addr = selectedDeliveryType === 'pickup' ? 'Self Pickup' : document.getElementById('custAddress').value.trim();
-    const date = document.getElementById('orderDate').value;
-    const time = document.getElementById('orderTime').value;
-    if (!name || !date || !time || (selectedDeliveryType === 'delivery' && !addr.trim())) {
-        shakeModal(); showToast('Please fill all details ❗', true); return;
-    }
-    // SAVE name & address for next time
-    savedName = name;
-    localStorage.setItem('sa_name', name);
-    if (selectedDeliveryType === 'delivery') {
-        savedAddress = addr;
-        localStorage.setItem('sa_address', addr);
-    }
-    db.ref('orders/').push({
-        itemName: currentItem.name,
-        customerName: name,
-        address: addr,
-        date, time,
-        deliveryType: selectedDeliveryType,
-        status: 'new',
-        orderedAt: Date.now(),
-        productKey: currentItem.key
-    }).then(() => {
-        closeModal();
-        cartCount++;
-        document.getElementById('cartCount').textContent = cartCount;
-        document.getElementById('successOverlay').classList.add('open');
-        document.getElementById('profileNotif').classList.add('show');
-        // Refresh my orders
-        loadMyOrders();
-    });
-}
 
 // ---- LOAD MY ORDERS (real-time) ----
 function loadMyOrders() {
