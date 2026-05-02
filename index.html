@@ -489,57 +489,22 @@ function setDeliveryType(type) {
 // ---- CUSTOMER APP: Modified placeOrder for AM/PM ----
 
 // ---- CUSTOMER APP: Updated placeOrder with Phone Number ----
+
 function placeOrder() {
-    const name = document.getElementById('custName').value.trim();
-    const phone = document.getElementById('custPhone').value.trim(); // Naya Phone field
-    const addr = selectedDeliveryType === 'pickup' ? 'Self Pickup' : document.getElementById('custAddress').value.trim();
-    const date = document.getElementById('orderDate').value;
-    const rawTime = document.getElementById('orderTime').value;
-
-    // Time to AM/PM converter
-    let timeWithAMPM = "";
-    if(rawTime) {
-        const [h, m] = rawTime.split(':');
-        const suffix = h >= 12 ? "PM" : "AM";
-        const hours = ((h % 12) || 12);
-        timeWithAMPM = hours + ":" + m + " " + suffix;
-    }
-
-    // Validation: Phone number check karein
-    if (!name || !phone || !date || !rawTime || (selectedDeliveryType === 'delivery' && !addr.trim())) {
-        shakeModal(); showToast('Please fill all details including Phone ❗', true); return;
-    }
+    // ... aapka purana code ...
     
-    if (phone.length < 8) {
-        shakeModal(); showToast('Please enter a valid mobile number 📞', true); return;
-    }
-
-    // SAVE details for next time
-    savedName = name;
-    savedPhone = phone; // Variable mein save karein
-    localStorage.setItem('sa_name', name);
-    localStorage.setItem('sa_phone', phone); // Phone memory mein save karein
-    if (selectedDeliveryType === 'delivery') {
-        savedAddress = addr;
-        localStorage.setItem('sa_address', addr);
-    }
-
-    // Firebase Push
-    db.ref('orders/').push({
+    const orderData = {
+        productKey: currentItemKey,
         itemName: currentItem.name,
+        itemPrice: currentItem.price, // <--- YE LINE ADD KAREIN (Zaroori)
         customerName: name,
-        customerPhone: phone, // Yeh merchant app ke "Call" button ke liye hai
+        customerPhone: phone,
         address: addr,
-        date, 
-        time: timeWithAMPM,
-        deliveryType: selectedDeliveryType,
-        status: 'new',
-        orderedAt: Date.now(),
-        productKey: currentItem.key
-    }).then(() => {
-        closeModal();
-        document.getElementById('successOverlay').classList.add('open');
-        loadMyOrders();
+        // ... baaki fields ...
+    };
+
+    db.ref('orders/').push(orderData).then(() => {
+        // ... success logic ...
     });
 }
 
@@ -623,22 +588,27 @@ function renderMyOrders() {
     const div = document.getElementById('myOrdersList');
     const entries = Object.entries(allMyOrders).sort((a,b)=>(b[1].orderedAt||0)-(a[1].orderedAt||0));
     document.getElementById('myOrderCount').textContent = entries.length;
+    
     if (!entries.length) {
         div.innerHTML = `<div class="empty-orders"><div class="big">📦</div><p>No orders yet.<br>Start shopping!</p></div>`;
         return;
     }
+
     div.innerHTML = entries.map(([key, o], idx) => {
         const status = o.status || 'new';
         const dtype = o.deliveryType || 'delivery';
 
-        // Status label
+        // --- PRICE LOGIC (Backup + Database) ---
+        // Agar database mein itemPrice hai to wo lo, nahi to product list se backup lo
+        const backupPrice = allProducts[o.productKey] ? allProducts[o.productKey].price : 0;
+        const finalPrice = o.itemPrice || backupPrice;
+
         const statusLabel = status === 'delivered'
             ? (dtype === 'pickup' ? '🟡 Pickup Done' : '✅ Delivered')
             : status === 'pickup' ? '🟡 Pickup Done'
             : '🟢 Processing';
         const statusClass = (status === 'delivered' || status === 'pickup') ? (dtype === 'pickup' ? 'pickup' : 'delivered') : 'new';
 
-        // Done info
         let doneHTML = '';
         if ((status === 'delivered' || status === 'pickup') && o.statusDate) {
             const verb = dtype === 'pickup' ? 'Picked up' : 'Delivered';
@@ -648,18 +618,13 @@ function renderMyOrders() {
             </div>`;
         }
 
-        // Tracker
-        const step1 = true; // always placed
-        const step2 = status !== 'new'; // processing → done
+        // Tracker logic
+        const step2 = status !== 'new';
         const step3 = status === 'delivered' || status === 'pickup';
-        const stepLabels = dtype === 'pickup'
-            ? ['Placed', 'Ready', 'Picked Up']
-            : ['Placed', 'Processing', 'Delivered'];
+        const stepLabels = dtype === 'pickup' ? ['Placed', 'Ready', 'Picked Up'] : ['Placed', 'Processing', 'Delivered'];
+        
         const trackerHTML = `<div class="tracker">
-            <div class="t-step">
-                <div class="t-dot done">✓</div>
-                <div class="t-label done">${stepLabels[0]}</div>
-            </div>
+            <div class="t-step"><div class="t-dot done">✓</div><div class="t-label done">${stepLabels[0]}</div></div>
             <div class="t-line ${step2?'done':''}"></div>
             <div class="t-step">
                 <div class="t-dot ${step2?(step3?'done':'active'):''}">
@@ -679,6 +644,11 @@ function renderMyOrders() {
         return `<div class="my-order-card">
             <div class="my-order-top">
                 <span class="my-order-id">#ORD-${String(entries.length - idx).padStart(4,'0')}</span>
+                
+                <span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 13px; margin-left: auto; margin-right: 8px;">
+                    ₹${Number(finalPrice).toLocaleString('en-IN')}
+                </span>
+
                 <span class="my-status ${statusClass}">${statusLabel}</span>
             </div>
             <div class="my-order-item" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
@@ -687,9 +657,11 @@ function renderMyOrders() {
                     const imgHTML = prod && prod.image
                         ? `<img src="${prod.image}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
                         : `<div style="width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${prod ? getEmoji(prod.name) : '🛍️'}</div>`;
-                    const prodName = prod ? prod.name : o.itemName;
-                    const prodPrice = prod ? '₹' + Number(prod.price).toLocaleString('en-IN') : '';
-                    return `${imgHTML}<div><div style="font-size:13px;font-weight:800;color:var(--text)">${prodName}</div><div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:2px;">${prodPrice}</div></div>`;
+                    
+                    return `${imgHTML}<div>
+                        <div style="font-size:13px;font-weight:800;color:var(--text)">${o.itemName}</div>
+                        <div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:2px;">₹${Number(finalPrice).toLocaleString('en-IN')}</div>
+                    </div>`;
                 })()}
             </div>
             <div class="my-order-info">
