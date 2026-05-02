@@ -524,11 +524,13 @@ function placeOrder() {
         localStorage.setItem('sa_address', addr);
     }
 
-    // Firebase Push
+    // Firebase Push — itemPrice & itemImage bhi save karo as fallback
     db.ref('orders/').push({
         itemName: currentItem.name,
+        itemPrice: currentItem.price || '',
+        itemImage: currentItem.image || '',
         customerName: name,
-        customerPhone: phone, // Yeh merchant app ke "Call" button ke liye hai
+        customerPhone: phone,
         address: addr,
         date, 
         time: timeWithAMPM,
@@ -684,11 +686,14 @@ function renderMyOrders() {
             <div class="my-order-item" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
                 ${(() => {
                     const prod = allProducts[o.productKey];
-                    const imgHTML = prod && prod.image
-                        ? `<img src="${prod.image}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
-                        : `<div style="width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${prod ? getEmoji(prod.name) : '🛍️'}</div>`;
-                    const prodName = prod ? prod.name : o.itemName;
-                    const prodPrice = prod ? '₹' + Number(prod.price).toLocaleString('en-IN') : '';
+                    const resolvedImg = (prod && prod.image) ? prod.image : (o.itemImage || '');
+                    const resolvedName = (prod && prod.name) ? prod.name : o.itemName;
+                    const resolvedPrice = (prod && prod.price) ? prod.price : o.itemPrice;
+                    const imgHTML = resolvedImg
+                        ? `<img src="${resolvedImg}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
+                        : `<div style="width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${getEmoji(resolvedName)}</div>`;
+                    const prodName = resolvedName;
+                    const prodPrice = resolvedPrice ? '₹' + Number(resolvedPrice).toLocaleString('en-IN') : '';
                     return `${imgHTML}<div><div style="font-size:13px;font-weight:800;color:var(--text)">${prodName}</div><div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:2px;">${prodPrice}</div></div>`;
                 })()}
             </div>
