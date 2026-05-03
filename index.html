@@ -241,7 +241,7 @@
             <input class="lg-name-inp" type="text" id="loginName" placeholder="e.g. Zamir Ansari" autocomplete="name">
             <label class="lg-label">Mobile Number</label>
             <div class="lg-phone-wrap">
-                <span class="lg-prefix">🇮🇳 +91</span>
+                <span class="lg-prefix">🇴🇲 +968</span>
                 <input class="lg-phone-inp" type="tel" id="loginPhone" placeholder="98765 43210" maxlength="10" inputmode="numeric">
             </div>
             <div id="recaptcha-container"></div>
@@ -432,11 +432,11 @@ function sendOTP() {
     const btn = document.getElementById('sendOtpBtn');
     btn.disabled = true; btn.textContent = '⏳ Sending...';
     initRecaptcha();
-    auth.signInWithPhoneNumber('+91' + phone, window.recaptchaVerifier)
+    auth.signInWithPhoneNumber('+968' + phone, window.recaptchaVerifier)
         .then(result => {
             confirmationResult = result;
             btn.disabled = false; btn.textContent = '📱 Send OTP';
-            document.getElementById('otpSubText').textContent = 'OTP sent to +91 ' + phone;
+            document.getElementById('otpSubText').textContent = 'OTP sent to +968 ' + phone;
             document.getElementById('step1').classList.remove('active');
             document.getElementById('step2').classList.add('active');
             document.querySelectorAll('.otp-box')[0].focus();
@@ -460,7 +460,7 @@ function verifyOTP() {
             currentUser = result.user;
             const name = document.getElementById('loginName').value.trim();
             const phone = document.getElementById('loginPhone').value.trim();
-            const profile = { uid: currentUser.uid, name, phone: '+91'+phone, updatedAt: Date.now() };
+            const profile = { uid: currentUser.uid, name, phone: '+968'+phone, updatedAt: Date.now() };
             db.ref('users/' + currentUser.uid).update(profile).then(() => {
                 userProfile = profile;
                 onLoginSuccess(profile);
